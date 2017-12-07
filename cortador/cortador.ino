@@ -1,3 +1,4 @@
+it
 #include <HX711.h>
 #include <ArduinoSTL.h>
 #include <TM1637Display.h>
@@ -53,18 +54,22 @@ std::vector<void (*)()>  states = {
     motorAction(0);
   },
   []() { // Estado 1 - Bajando
-    if((digitalRead(BTN_POWER) == LOW) && ( (millis() - tiempo) > 1000) ){
+    if(digitalRead(BTN_POWER) == LOW && millis() - tiempo > 1000){
       state = 3;
     }
     motorAction(-1);
-    double m = scale.get_value();
-    Serial.print("Measured: "); serial.println(m);
-    if(m > 100){
+    measure = scale.get_value();
+    /*if(measure > 100){
       state = 2;
-    }
+    }*/
   }, 
   []() { // Estado 2 - Cortando
-  
+    if(digitalRead(BTN_POWER) == LOW && millis() - tiempo > 1000){
+      state = 3;
+    }
+    double m = scale.get_value();
+    measure = m;
+    motorAction(-1);
   },
   []() { // Estado 3 - Subiendo
     if(digitalRead(FIN_CARRERA) == LOW){
@@ -92,5 +97,11 @@ void setup() {
 
 void loop() {
      states[state]();
-     display.showNumberDec(measure, false);
+     static int next_change = 0; int t = millis();
+     if(t > next_change){
+        Serial.print("Measured: "); Serial.println(measure);
+        Serial.print("State: "); Serial.println(state);
+        display.showNumberDec(measure, false);
+        next_change = t + 1000;
+     }
 }
