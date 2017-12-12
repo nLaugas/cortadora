@@ -1,7 +1,10 @@
-it
+
 #include <HX711.h>
 #include <ArduinoSTL.h>
 #include <TM1637Display.h>
+#include <TimerOne.h>
+
+#define SCALE_SLEEP
 
 #define BTN_POWER 2
 #define FIN_CARRERA 3
@@ -15,32 +18,15 @@ it
 #define TM1637_CLK 5
 #define TM1637_DIO 6
 
+#define INICIO_CORTE 6
+#define FIN_CORTE 4
+
 int state = 0;
-int sentido;
-int stepDelay = 700;
-bool b;
 unsigned long tiempo;
 HX711 scale(HX711_DT, HX711_CLK);
 TM1637Display display(TM1637_CLK, TM1637_DIO);
 
 double measure;
-
-void motorAction(int sentido){
-  int a;
-  if(sentido != 0){
-    if (sentido == 1)
-    {
-      a=0;
-    }
-    else{
-      a=1; 
-    }
-    b=!b;
-    digitalWrite(DIR_PIN, a);
-    digitalWrite(STEP_PIN, b);
-    delayMicroseconds(stepDelay);
-  }
-}
 
 std::vector<void (*)()>  states = {
   []() { // Estado 0 - Detenido
@@ -48,51 +34,64 @@ std::vector<void (*)()>  states = {
       state = 1;
       tiempo = millis();
       digitalWrite(ENABLE,LOW);
+      digitalWrite(DIR_PIN, 0);
       scale.power_up();
-      scale.tare();
     }
-    motorAction(0);
   },
   []() { // Estado 1 - Bajando
     if(digitalRead(BTN_POWER) == LOW && millis() - tiempo > 1000){
+      digitalWrite(DIR_PIN, 1);
       state = 3;
     }
-    motorAction(-1);
-    measure = scale.get_value();
-    /*if(measure > 100){
+    measure = scale.get_units(10);
+    if(measure > INICIO_CORTE){
       state = 2;
-    }*/
+    }
   }, 
   []() { // Estado 2 - Cortando
-    if(digitalRead(BTN_POWER) == LOW && millis() - tiempo > 1000){
+    double m = scale.get_units(10);
+    if((digitalRead(BTN_POWER) == LOW && millis() - tiempo > 1000) || measure < FIN_CORTE){
       state = 3;
+      digitalWrite(DIR_PIN, 1);
+    }else{
+      measure = m;
     }
-    double m = scale.get_value();
-    measure = m;
-    motorAction(-1);
   },
   []() { // Estado 3 - Subiendo
     if(digitalRead(FIN_CARRERA) == LOW){
       state = 0;
       digitalWrite(ENABLE,HIGH);
+#ifdef SCALE_SLEEP
       scale.power_down();
+#endif
     }     
-    motorAction(1);
   }
 };
 
 int c = 0;
 
 void setup() {
+  pinMode(ENABLE, OUTPUT);
+  digitalWrite(ENABLE,HIGH);
   Serial.begin(9600);
   pinMode(BTN_POWER,INPUT_PULLUP);
   pinMode(FIN_CARRERA,INPUT_PULLUP);
   pinMode(DIR_PIN, OUTPUT);
   pinMode(STEP_PIN, OUTPUT);
-  pinMode(ENABLE, OUTPUT);  
+  pinMode(ENABLE, OUTPUT);
   digitalWrite(ENABLE,HIGH);
-  scale.power_down();
+
+  Timer1.initialize(900);
+  Timer1.pwm(STEP_PIN, 512);
+  
+  scale.set_scale();
+  scale.set_scale(22192);
+  scale.tare();
+#ifdef SCALE_SLEEP
+      scale.power_down();
+#endif
   display.setBrightness(0x0f);
+  measure = 0;
 }
 
 void loop() {
@@ -101,7 +100,11 @@ void loop() {
      if(t > next_change){
         Serial.print("Measured: "); Serial.println(measure);
         Serial.print("State: "); Serial.println(state);
-        display.showNumberDec(measure, false);
+        display.showNumberDec((int)((int)measure % 1000), false);
         next_change = t + 1000;
+        if(Serial.available())
+        {
+          scale.set_scale(Serial.parseInt());
+        }
      }
 }
