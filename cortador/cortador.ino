@@ -1,4 +1,4 @@
-
+  
 #include <HX711.h>
 #include <ArduinoSTL.h>
 #include <TM1637Display.h>
@@ -7,9 +7,11 @@
 #define SCALE_SLEEP
 
 #define BTN_POWER 2
-#define FIN_CARRERA 3
-#define DIR_PIN 8
-#define STEP_PIN 9
+#define FIN_CARRERA_ALTO 4
+#define FIN_CARRERA_BAJO 3
+
+#define DIR_PIN 9
+#define STEP_PIN 8
 #define ENABLE 7
 
 #define HX711_DT A1
@@ -21,15 +23,16 @@
 #define INICIO_CORTE 6
 #define FIN_CORTE 4
 
-int state = 0;
+volatile int state = 0;
 unsigned long tiempo;
+
 HX711 scale(HX711_DT, HX711_CLK);
 TM1637Display display(TM1637_CLK, TM1637_DIO);
 
 double measure;
 
 std::vector<void (*)()>  states = {
-  []() { // Estado 0 - Detenido
+  []() { // Estado 0 - DETENIDO
     if(digitalRead(BTN_POWER)== LOW){
       state = 1;
       tiempo = millis();
@@ -38,17 +41,18 @@ std::vector<void (*)()>  states = {
       scale.power_up();
     }
   },
-  []() { // Estado 1 - Bajando
-    if(digitalRead(BTN_POWER) == LOW && millis() - tiempo > 1000){
+  []() { // Estado 1 - BAJANDO
+    if ((digitalRead(BTN_POWER) == LOW && millis() - tiempo > 1000)){
       digitalWrite(DIR_PIN, 1);
       state = 3;
+      
     }
     measure = scale.get_units(10);
     if(measure > INICIO_CORTE){
       state = 2;
     }
   }, 
-  []() { // Estado 2 - Cortando
+  []() { // Estado 2 - CORTANDO
     double m = scale.get_units(10);
     if((digitalRead(BTN_POWER) == LOW && millis() - tiempo > 1000) || measure < FIN_CORTE){
       state = 3;
@@ -57,9 +61,10 @@ std::vector<void (*)()>  states = {
       measure = m;
     }
   },
-  []() { // Estado 3 - Subiendo
-    if(digitalRead(FIN_CARRERA) == LOW){
+  []() { // Estado 3 - SUBIENDO
+    if(digitalRead(FIN_CARRERA_ALTO) == LOW){
       state = 0;
+      Serial.print(state);
       digitalWrite(ENABLE,HIGH);
 #ifdef SCALE_SLEEP
       scale.power_down();
@@ -68,19 +73,21 @@ std::vector<void (*)()>  states = {
   }
 };
 
-int c = 0;
+
 
 void setup() {
   pinMode(ENABLE, OUTPUT);
   digitalWrite(ENABLE,HIGH);
   Serial.begin(9600);
   pinMode(BTN_POWER,INPUT_PULLUP);
-  pinMode(FIN_CARRERA,INPUT_PULLUP);
+  
+  pinMode(FIN_CARRERA_ALTO,INPUT_PULLUP);
+  pinMode(FIN_CARRERA_BAJO,INPUT_PULLUP);
   pinMode(DIR_PIN, OUTPUT);
   pinMode(STEP_PIN, OUTPUT);
-  pinMode(ENABLE, OUTPUT);
-  digitalWrite(ENABLE,HIGH);
 
+  attachInterrupt( digitalPinToInterrupt(FIN_CARRERA_BAJO), ServicioBoton, FALLING);
+  
   Timer1.initialize(900);
   Timer1.pwm(STEP_PIN, 512);
   
@@ -107,4 +114,9 @@ void loop() {
           scale.set_scale(Serial.parseInt());
         }
      }
+}
+
+void ServicioBoton (){
+      digitalWrite(DIR_PIN,1);
+      state = 3;
 }
