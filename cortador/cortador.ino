@@ -14,6 +14,10 @@
 #define STEP_PIN 8
 #define ENABLE 7
 
+#define MS1 13
+#define MS2 12
+#define MS3 11
+
 #define HX711_DT A1
 #define HX711_CLK A0
 
@@ -85,6 +89,13 @@ void setup() {
   pinMode(FIN_CARRERA_BAJO,INPUT_PULLUP);
   pinMode(DIR_PIN, OUTPUT);
   pinMode(STEP_PIN, OUTPUT);
+
+  pinMode(MS1,OUTPUT);
+  pinMode(MS2,OUTPUT);
+  pinMode(MS3,OUTPUT);
+  digitalWrite(MS1,HIGH);
+  digitalWrite(MS2,HIGH);
+  digitalWrite(MS3,HIGH);
 
   attachInterrupt( digitalPinToInterrupt(FIN_CARRERA_BAJO), ServicioBoton, FALLING);
   
