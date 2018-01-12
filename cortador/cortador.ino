@@ -1,4 +1,3 @@
-  
 #include <HX711.h>
 #include <ArduinoSTL.h>
 #include <TM1637Display.h>
@@ -6,28 +5,28 @@
 
 #define SCALE_SLEEP
 
-#define BTN_POWER 2
 #define FIN_CARRERA_ALTO 4
 #define FIN_CARRERA_BAJO 3
+#define BTN_POWER 2
 
-#define DIR_PIN 9
-#define STEP_PIN 8
+#define DIR_PIN 8
+#define STEP_PIN 9
 #define ENABLE 7
-
-#define MS1 13
-#define MS2 12
-#define MS3 11
 
 #define HX711_DT A1
 #define HX711_CLK A0
 
-#define TM1637_CLK 5
-#define TM1637_DIO 6
+#define TM1637_CLK 6
+#define TM1637_DIO 5
+
+#define MS0 13
+#define MS1 12
+#define MS2 11
 
 #define INICIO_CORTE 6
 #define FIN_CORTE 4
 
-volatile int state = 0;
+volatile int state = 3;
 unsigned long tiempo;
 
 HX711 scale(HX711_DT, HX711_CLK);
@@ -80,8 +79,16 @@ std::vector<void (*)()>  states = {
 
 
 void setup() {
+  
+  pinMode(MS0,OUTPUT);
+  pinMode(MS1,OUTPUT);
+  pinMode(MS2,OUTPUT);
+  digitalWrite(MS0,HIGH);
+  digitalWrite(MS1,HIGH);
+  digitalWrite(MS2,HIGH);
+  
   pinMode(ENABLE, OUTPUT);
-  digitalWrite(ENABLE,HIGH);
+  
   Serial.begin(9600);
   pinMode(BTN_POWER,INPUT_PULLUP);
   
@@ -90,17 +97,13 @@ void setup() {
   pinMode(DIR_PIN, OUTPUT);
   pinMode(STEP_PIN, OUTPUT);
 
-  pinMode(MS1,OUTPUT);
-  pinMode(MS2,OUTPUT);
-  pinMode(MS3,OUTPUT);
-  digitalWrite(MS1,HIGH);
-  digitalWrite(MS2,HIGH);
-  digitalWrite(MS3,HIGH);
-
+  digitalWrite(ENABLE,LOW);
+  
   attachInterrupt( digitalPinToInterrupt(FIN_CARRERA_BAJO), ServicioBoton, FALLING);
   
   Timer1.initialize(900);
   Timer1.pwm(STEP_PIN, 512);
+  
   
   scale.set_scale();
   scale.set_scale(22192);
@@ -114,6 +117,7 @@ void setup() {
 
 void loop() {
      states[state]();
+     Serial.println(state);
      static int next_change = 0; int t = millis();
      if(t > next_change){
         Serial.print("Measured: "); Serial.println(measure);
@@ -131,3 +135,4 @@ void ServicioBoton (){
       digitalWrite(DIR_PIN,1);
       state = 3;
 }
+
