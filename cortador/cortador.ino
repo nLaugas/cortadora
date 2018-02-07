@@ -23,8 +23,8 @@
 #define MS1 12
 #define MS2 11
 
-#define INICIO_CORTE 6
-#define FIN_CORTE 4
+#define INICIO_CORTE 60
+#define FIN_CORTE 40
 
 volatile int state = 3;
 unsigned long tiempo;
@@ -41,6 +41,7 @@ std::vector<void (*)()>  states = {
       tiempo = millis();
       digitalWrite(ENABLE,LOW);
       digitalWrite(DIR_PIN, 0);
+      measure = 0;
       scale.power_up();
     }
   },
@@ -50,24 +51,23 @@ std::vector<void (*)()>  states = {
       state = 3;
       
     }
-    measure = scale.get_units(10);
+    measure = scale.get_units(5);
     if(measure > INICIO_CORTE){
       state = 2;
     }
   }, 
   []() { // Estado 2 - CORTANDO
     double m = scale.get_units(10);
-    if((digitalRead(BTN_POWER) == LOW && millis() - tiempo > 1000) || measure < FIN_CORTE){
+    if((digitalRead(BTN_POWER) == LOW && millis() - tiempo > 1000) || m < FIN_CORTE){
       state = 3;
       digitalWrite(DIR_PIN, 1);
-    }else{
+    }else if(measure < m){
       measure = m;
     }
   },
   []() { // Estado 3 - SUBIENDO
     if(digitalRead(FIN_CARRERA_ALTO) == LOW){
       state = 0;
-      Serial.print(state);
       digitalWrite(ENABLE,HIGH);
 #ifdef SCALE_SLEEP
       scale.power_down();
@@ -106,7 +106,9 @@ void setup() {
   
   
   scale.set_scale();
-  scale.set_scale(22192);
+  scale.tare();
+  //scale.set_scale(222515);
+  scale.set_scale(227);
   scale.tare();
 #ifdef SCALE_SLEEP
       scale.power_down();
@@ -117,12 +119,16 @@ void setup() {
 
 void loop() {
      states[state]();
-     Serial.println(state);
      static int next_change = 0; int t = millis();
      if(t > next_change){
-        Serial.print("Measured: "); Serial.println(measure);
-        Serial.print("State: "); Serial.println(state);
-        display.showNumberDec((int)((int)measure % 1000), false);
+        if(state > 0){
+          Serial.print("Measured: "); Serial.println(measure);
+          Serial.print("State: "); Serial.println(state);
+        }
+        if(measure > 0)
+          display.showNumberDec((int)measure % 10000, false);
+        else
+          display.showNumberDec(0, false);
         next_change = t + 1000;
         if(Serial.available())
         {
