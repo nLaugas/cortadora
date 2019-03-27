@@ -1,0 +1,1 @@
+Maquina de estado para medir terneza de carne en Newton
